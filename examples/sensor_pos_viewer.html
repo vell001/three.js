@@ -11,7 +11,7 @@
 <body>
 <div id="info">
 	<input type="file" id="load_sensor_config_data"/><br/>
-	选中的对象为：<span id="objInfo"></span>
+	过滤对象: <input value="[]" id="sensor_names">
 </div>
 
 <!-- Import maps polyfill -->
@@ -25,15 +25,6 @@
 					"three/addons/": "./jsm/"
 				}
 			}
-
-
-
-
-
-
-
-
-
 
 
 </script>
@@ -64,6 +55,12 @@
 	const pointer = new THREE.Vector2();
 	let INTERSECTED = undefined;
 
+	let sensorNames = undefined;
+
+	document.getElementById("sensor_names").addEventListener("change",function () {
+		sensorNames = JSON.parse(this.value);
+		updateSensorObj();
+	});
 
 	function onPointerMove(event) {
 		pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -72,7 +69,7 @@
 
 	document.addEventListener('mousemove', onPointerMove);
 
-	function genAxisObj(size, color, name="default") {
+	function genAxisObj(size, color, name) {
 		let obj = new THREE.Object3D();
 		let axisHelper = new THREE.AxesHelper(size * 5);
 
@@ -83,9 +80,11 @@
 		let mesh = new THREE.Mesh(geometry, material);
 		obj.add(axisHelper);
 		obj.add(mesh);
-		let nameObj = createText(name);
-		if (nameObj){
-			obj.add(nameObj);
+		if (name) {
+			let nameObj = createText(name);
+			if (nameObj) {
+				obj.add(nameObj);
+			}
 		}
 		return obj;
 	}
@@ -136,7 +135,6 @@
 
 	};
 
-	const sensorNames = ["front_middle_camera", "MIDDLE_LIDAR", "rtk"]
 
 	function findPose(data, poses) {
 		if (data instanceof Array) {
@@ -145,7 +143,7 @@
 			}
 		} else if (data instanceof Object) {
 			if (data.hasOwnProperty("pose") && data.hasOwnProperty("name")) {
-				if (sensorNames.indexOf(data.name) < 0) {
+				if (sensorNames && sensorNames.length > 0 && sensorNames.indexOf(data.name) < 0) {
 					return
 				}
 				poses.push(data);
@@ -231,29 +229,30 @@
 
 	loadFont();
 
-	function createText(message, height = 0.2, size=0.2) {
-		const matLite = new THREE.MeshBasicMaterial( {
-			color: 0x00FF00,
+	function createText(message, size = 0.05, hover = 0.1) {
+		const matLite = new THREE.MeshBasicMaterial({
+			color: 0xFFFFFF,
 			transparent: true,
-			opacity: 0.4,
+			opacity: 0.8,
 			side: THREE.DoubleSide
-		} );
-		if (font===undefined){
+		});
+		if (font === undefined) {
 			return undefined;
 		}
-		const shapes = font.generateShapes( message, size );
+		const shapes = font.generateShapes(message, size);
 
-		const geometry = new THREE.ShapeGeometry( shapes );
+		const geometry = new THREE.ShapeGeometry(shapes);
 
 		geometry.computeBoundingBox();
 
-		const xMid = - 0.5 * ( geometry.boundingBox.max.x - geometry.boundingBox.min.x );
+		const xMid = -0.5 * (geometry.boundingBox.max.x - geometry.boundingBox.min.x);
 
-		geometry.translate( xMid, 0, 0 );
+		geometry.rotateX(Math.PI / 2);
+		geometry.translate(xMid, 0, hover);
 
 		// make shape ( N.B. edge view not visible )
 
-		const text = new THREE.Mesh( geometry, matLite );
+		const text = new THREE.Mesh(geometry, matLite);
 		return text;
 	}
 
@@ -271,7 +270,6 @@
 		renderer.outputEncoding = THREE.sRGBEncoding;
 		renderer.toneMapping = THREE.ReinhardToneMapping;
 		renderer.toneMappingExposure = 3;
-		renderer.domElement.style.background = 'linear-gradient( 180deg, rgba( 0,0,0,1 ) 0%, rgba( 128,128,255,1 ) 100% )';
 		container.appendChild(renderer.domElement);
 
 		//
