@@ -1,17 +1,55 @@
 <!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/html">
+<html>
 <head>
 	<title>three.js webgl - arcball controls</title>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-	<link type="text/css" rel="stylesheet" href="main.css">
+	<style>
+		body {
+			margin: 0;
+			background-color: #000;
+			color: #fff;
+			font-family: Monospace;
+			font-size: 13px;
+			line-height: 24px;
+			overscroll-behavior: none;
+		}
+
+		#info {
+			position: absolute;
+			top: 0px;
+			width: auto;
+			padding: 10px;
+			box-sizing: border-box;
+			text-align: left;
+			-moz-user-select: none;
+			-webkit-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			pointer-events: auto;
+			z-index: 1; /* TODO Solve this in HTML */
+		}
+	</style>
 
 </head>
 
 <body>
+<div id="canvas">
+</div>
 <div id="info">
 	<input type="file" id="load_sensor_config_data"/><br/>
-	过滤对象: <input value="[]" id="sensor_names">
+	<table id="check_pose_table">
+		<thead>
+		<tr>
+			<th><input id="check_pose_body_all" type="checkbox"></th>
+			<th>no.</th>
+			<th>name</th>
+		</tr>
+		</thead>
+		<tbody id="check_pose_body">
+
+		</tbody>
+	</table>
 </div>
 
 <!-- Import maps polyfill -->
@@ -25,6 +63,8 @@
 					"three/addons/": "./jsm/"
 				}
 			}
+
+
 
 
 </script>
@@ -55,12 +95,72 @@
 	const pointer = new THREE.Vector2();
 	let INTERSECTED = undefined;
 
-	let sensorNames = undefined;
+	let poses = [];
 
-	document.getElementById("sensor_names").addEventListener("change",function () {
-		sensorNames = JSON.parse(this.value);
+	String.format = function (src) {
+		if (arguments.length === 0) return null;
+		let args = Array.prototype.slice.call(arguments, 1);
+		return src.replace(/\{(\d+)\}/g, function (m, i) {
+			return args[i];
+		});
+	};
+
+	function updateAllChecker() {
+		let check_pose_body_all = document.getElementById("check_pose_body_all");
+		let all_checked = true;
+		for (let i in poses) {
+			if (!poses[i]._checked) {
+				all_checked = false;
+				break;
+			}
+		}
+		check_pose_body_all.checked = all_checked;
+		check_pose_body_all.onclick = function () {
+			checkPose(check_pose_body_all, -1);
+		}
+	}
+
+	function checkPose(obj, idx) {
+		let checked = obj.checked;
+		if (idx < 0) {
+			// 全选
+			for (let i in poses) {
+				poses[i]._checked = checked;
+			}
+			updatePoseCheckerInfo();
+		} else {
+			poses[idx]._checked = checked;
+		}
+		updateAllChecker();
 		updateSensorObj();
-	});
+	}
+
+	function updatePoseCheckerInfo() {
+		let check_pose_body = document.getElementById("check_pose_body");
+		check_pose_body.innerHTML = "";
+		for (let i in poses) {
+			let tr = document.createElement("tr");
+			let checkbox = document.createElement("input");
+			let td_cb = document.createElement("td");
+			let td_no = document.createElement("td");
+			let td_name = document.createElement("td");
+			checkbox.type = "checkbox";
+			checkbox.checked = poses[i]._checked;
+			checkbox.onclick = function() {
+				checkPose(checkbox, i);
+				console.log(checkbox, i);
+			}
+			td_no.innerText = i.toString();
+			td_name.innerText = poses[i].name;
+
+			td_cb.appendChild(checkbox);
+			tr.appendChild(td_cb);
+			tr.appendChild(td_no);
+			tr.appendChild(td_name);
+			check_pose_body.appendChild(tr);
+		}
+		updateAllChecker();
+	}
 
 	function onPointerMove(event) {
 		pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -142,10 +242,8 @@
 				findPose(data[d], poses)
 			}
 		} else if (data instanceof Object) {
-			if (data.hasOwnProperty("pose") && data.hasOwnProperty("name")) {
-				if (sensorNames && sensorNames.length > 0 && sensorNames.indexOf(data.name) < 0) {
-					return
-				}
+			if (data.hasOwnProperty("pose")) {
+				data["_checked"] = true;
 				poses.push(data);
 			} else {
 				for (let d in data) {
@@ -163,10 +261,10 @@
 		}
 		sensorObj.clear();
 
-		let poses = [];
-		findPose(sensorConfig, poses)
-		console.log(poses)
 		for (let i in poses) {
+			if (!poses[i]._checked) {
+				continue
+			}
 			let p = poses[i];
 			let translation = p["pose"]["translation"]
 			let attitude = p["pose"]["attitude"]
@@ -200,6 +298,7 @@
 			obj.setRotationFromQuaternion(quaternion);
 			sensorObj.add(obj);
 		}
+		render();
 	}
 
 	document.getElementById("load_sensor_config_data").addEventListener('change', function () {
@@ -211,7 +310,9 @@
 		reader.onload = function () {
 			sensorConfig = JSON.parse(reader.result);
 			console.log(sensorConfig);
+			findPose(sensorConfig, poses);
 			updateSensorObj();
+			updatePoseCheckerInfo();
 		}
 		reader.readAsText(this.files[0]);
 	});
@@ -260,7 +361,7 @@
 
 	function init() {
 
-		const container = document.createElement('div');
+		const container = document.getElementById("canvas");
 		document.body.appendChild(container);
 
 		renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
