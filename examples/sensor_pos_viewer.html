@@ -310,6 +310,7 @@
 		reader.onload = function () {
 			sensorConfig = JSON.parse(reader.result);
 			console.log(sensorConfig);
+			poses = [];
 			findPose(sensorConfig, poses);
 			updateSensorObj();
 			updatePoseCheckerInfo();
