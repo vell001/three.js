@@ -22,10 +22,6 @@
 			padding: 10px;
 			box-sizing: border-box;
 			text-align: left;
-			-moz-user-select: none;
-			-webkit-user-select: none;
-			-ms-user-select: none;
-			user-select: none;
 			pointer-events: auto;
 			z-index: 1; /* TODO Solve this in HTML */
 		}
@@ -50,6 +46,8 @@
 
 		</tbody>
 	</table>
+	<br/>
+	<div id="rt_info"></div>
 </div>
 
 <!-- Import maps polyfill -->
@@ -63,6 +61,21 @@
 					"three/addons/": "./jsm/"
 				}
 			}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -133,6 +146,108 @@
 		}
 		updateAllChecker();
 		updateSensorObj();
+		updateRTInfo();
+	}
+
+	function setPose2Obj(pose, obj) {
+		let translation = pose["pose"]["translation"]
+		let attitude = pose["pose"]["attitude"]
+		if (!attitude.x) {
+			attitude.x = 0
+		}
+		if (!attitude.y) {
+			attitude.y = 0
+		}
+		if (!attitude.z) {
+			attitude.z = 0
+		}
+		if (!attitude.w) {
+			attitude.w = 0
+		}
+		if (!translation.x) {
+			translation.x = 0
+		}
+		if (!translation.y) {
+			translation.y = 0
+		}
+		if (!translation.z) {
+			translation.z = 0
+		}
+		obj.translateX(translation.x);
+		obj.translateY(translation.y);
+		obj.translateZ(translation.z);
+		const quaternion = new THREE.Quaternion(attitude.x, attitude.y, attitude.z, attitude.w)
+		obj.setRotationFromQuaternion(quaternion);
+	}
+
+	function genRTText(ai, bi, T, E) {
+		return String.format("========== {1}为原点, {0} => {1}: <br/>" +
+			"T:{2},{3},{4} <br/>" +
+			"R:<br/>" +
+			"{5},{6},{7},<br/>" +
+			"{8},{9},{10},<br/>" +
+			"{11},{12},{13}<br/>" +
+			"Euler:{14},{15},{16}<br/>", ai, bi, T.elements[12], T.elements[13], T.elements[14],
+			T.elements[0], T.elements[4], T.elements[8],
+			T.elements[1], T.elements[5], T.elements[9],
+			T.elements[2], T.elements[6], T.elements[10],
+			E.x / Math.PI * 180, E.y / Math.PI * 180, E.z / Math.PI * 180
+		);
+	}
+
+	function updateRTInfo() {
+		let rt_info = document.getElementById("rt_info");
+		rt_info.innerText = "";
+		let ai, bi;
+		for (let i in poses) {
+			if (poses[i]._checked) {
+				if (!ai) {
+					ai = i;
+					continue;
+				}
+				if (!bi) {
+					bi = i;
+					break;
+				}
+			}
+		}
+
+		if (ai && bi) {
+			// 计算两者的相对RT a => b
+			let a = poses[ai];
+			let b = poses[bi];
+			let a_name = a.name?a.name:a;
+			let b_name = b.name?b.name:b;
+
+			let oa = new THREE.Object3D();
+			let ob = new THREE.Object3D();
+
+			setPose2Obj(a, oa);
+			setPose2Obj(b, ob);
+			oa.updateWorldMatrix(true, false);
+			ob.updateWorldMatrix(true, false);
+
+			// 有点奇怪，这样的计算刚好可以对应上
+			let T_ab = oa.matrixWorld.premultiply(ob.matrixWorld.invert())
+			let E_ab = new THREE.Euler();
+			E_ab.setFromRotationMatrix(T_ab);
+			rt_info.innerHTML += genRTText(a_name, b_name, T_ab, E_ab);
+
+			let T_ba = T_ab.invert();
+			let E_ba = new THREE.Euler();
+			E_ba.setFromRotationMatrix(T_ba);
+			rt_info.innerHTML += genRTText(b_name, a_name, T_ba, E_ba);
+		} else if(ai) {
+			let a = poses[ai];
+			let a_name = a.name?a.name:a;
+			let oa = new THREE.Object3D();
+			setPose2Obj(a, oa);
+			oa.updateWorldMatrix(true, false);
+			let T_a = oa.matrixWorld;
+			let E_a = new THREE.Euler();
+			E_a.setFromRotationMatrix(T_a);
+			rt_info.innerHTML += genRTText(a_name, "car", T_a, E_a);
+		}
 	}
 
 	function updatePoseCheckerInfo() {
@@ -146,7 +261,7 @@
 			let td_name = document.createElement("td");
 			checkbox.type = "checkbox";
 			checkbox.checked = poses[i]._checked;
-			checkbox.onclick = function() {
+			checkbox.onclick = function () {
 				checkPose(checkbox, i);
 				console.log(checkbox, i);
 			}
@@ -224,8 +339,8 @@
 				controls.setGizmosVisible(arcballGui.gizmoVisible);
 
 			});
-			folderOptions.add(controls, 'copyState').name('Copy state(ctrl+c)');
-			folderOptions.add(controls, 'pasteState').name('Paste state(ctrl+v)');
+			folderOptions.add(controls, 'copyState').name('Copy state');
+			folderOptions.add(controls, 'pasteState').name('Paste state');
 			folderOptions.add(controls, 'reset').name('Reset');
 			folderAnimations.add(controls, 'enableAnimations').name('Enable anim.');
 			folderAnimations.add(controls, 'dampingFactor', 0, 100, 1).name('Damping');
@@ -266,36 +381,10 @@
 				continue
 			}
 			let p = poses[i];
-			let translation = p["pose"]["translation"]
-			let attitude = p["pose"]["attitude"]
-			if (!attitude.x) {
-				attitude.x = 0
-			}
-			if (!attitude.y) {
-				attitude.y = 0
-			}
-			if (!attitude.z) {
-				attitude.z = 0
-			}
-			if (!attitude.w) {
-				attitude.w = 0
-			}
-			if (!translation.x) {
-				translation.x = 0
-			}
-			if (!translation.y) {
-				translation.y = 0
-			}
-			if (!translation.z) {
-				translation.z = 0
-			}
+
 			let obj = genAxisObj(0.1, 0xFF0000, p["name"]);
 			obj.name = p["name"];
-			obj.translateX(translation.x);
-			obj.translateY(translation.y);
-			obj.translateZ(translation.z);
-			const quaternion = new THREE.Quaternion(attitude.x, attitude.y, attitude.z, attitude.w)
-			obj.setRotationFromQuaternion(quaternion);
+			setPose2Obj(p, obj);
 			sensorObj.add(obj);
 		}
 		render();
@@ -314,6 +403,7 @@
 			findPose(sensorConfig, poses);
 			updateSensorObj();
 			updatePoseCheckerInfo();
+			updateRTInfo();
 		}
 		reader.readAsText(this.files[0]);
 	});
@@ -493,25 +583,6 @@
 	}
 
 	function onKeyDown(event) {
-
-		if (event.key === 'c') {
-
-			if (event.ctrlKey || event.metaKey) {
-
-				controls.copyState();
-
-			}
-
-		} else if (event.key === 'v') {
-
-			if (event.ctrlKey || event.metaKey) {
-
-				controls.pasteState();
-
-			}
-
-		}
-
 	}
 
 	function setCamera(type) {
