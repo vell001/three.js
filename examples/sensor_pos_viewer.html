@@ -38,7 +38,7 @@
 		<thead>
 		<tr>
 			<th><input id="check_pose_body_all" type="checkbox"></th>
-			<th>no.</th>
+			<th>all</th>
 			<th>name</th>
 		</tr>
 		</thead>
@@ -46,7 +46,6 @@
 
 		</tbody>
 	</table>
-	<br/>
 	<div id="rt_info"></div>
 </div>
 
@@ -61,24 +60,6 @@
 					"three/addons/": "./jsm/"
 				}
 			}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 </script>
 
@@ -216,8 +197,8 @@
 			// 计算两者的相对RT a => b
 			let a = poses[ai];
 			let b = poses[bi];
-			let a_name = a.name?a.name:a;
-			let b_name = b.name?b.name:b;
+			let a_name = a.name ? a.name : a;
+			let b_name = b.name ? b.name : b;
 
 			let oa = new THREE.Object3D();
 			let ob = new THREE.Object3D();
@@ -237,9 +218,9 @@
 			let E_ba = new THREE.Euler();
 			E_ba.setFromRotationMatrix(T_ba);
 			rt_info.innerHTML += genRTText(b_name, a_name, T_ba, E_ba);
-		} else if(ai) {
+		} else if (ai) {
 			let a = poses[ai];
-			let a_name = a.name?a.name:a;
+			let a_name = a.name ? a.name : a;
 			let oa = new THREE.Object3D();
 			setPose2Obj(a, oa);
 			oa.updateWorldMatrix(true, false);
@@ -351,18 +332,21 @@
 	};
 
 
-	function findPose(data, poses) {
+	function findPose(data, poses, defaultName = "") {
 		if (data instanceof Array) {
 			for (let d in data) {
-				findPose(data[d], poses)
+				findPose(data[d], poses, defaultName + "_" + d.toString())
 			}
 		} else if (data instanceof Object) {
 			if (data.hasOwnProperty("pose")) {
 				data["_checked"] = true;
+				if (!data.hasOwnProperty("name")) {
+					data["name"] = defaultName;
+				}
 				poses.push(data);
 			} else {
 				for (let d in data) {
-					findPose(data[d], poses)
+					findPose(data[d], poses, d)
 				}
 			}
 		}
